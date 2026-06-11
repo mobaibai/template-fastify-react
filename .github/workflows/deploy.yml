@@ -1,0 +1,63 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all
+        run: pnpm run build
+
+      - name: Deploy Web (static files)
+        uses: easingthemes/ssh-deploy@main
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: -rlgoDzvc -i --delete
+          SOURCE: apps/web/dist/
+          TARGET: ${{ secrets.SERVER_WEB_PATH }}
+          SCRIPT_BEFORE: |
+            mkdir -p ${{ secrets.SERVER_WEB_PATH }}
+
+      - name: Deploy API (server bundle)
+        uses: easingthemes/ssh-deploy@main
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: -rlgoDzvc -i --delete
+          SOURCE: apps/api/dist/bundle.cjs
+          TARGET: ${{ secrets.SERVER_API_PATH }}
+          SCRIPT_BEFORE: |
+            mkdir -p ${{ secrets.SERVER_API_PATH }}
+
+      - name: Deploy PM2 config & restart
+        uses: easingthemes/ssh-deploy@main
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: -rlgoDzvc -i --delete
+          SOURCE: ecosystem.config.js
+          TARGET: ${{ secrets.SERVER_API_PATH }}
+
+      - name: Restart PM2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT || '22' }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ${{ secrets.SERVER_API_PATH }}
+            pm2 start ecosystem.config.js || pm2 restart ecosystem.config.js

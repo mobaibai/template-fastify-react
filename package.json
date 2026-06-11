@@ -1,0 +1,42 @@
+{
+  "name": "template-fastify-react",
+  "description": "A modern Fastify And React template",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "fastify",
+    "react",
+    "typescript",
+    "antd",
+    "unocss",
+    "template"
+  ],
+  "author": "PureSilent",
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=@repo/web",
+    "dev:api": "turbo run dev --filter=@repo/api",
+    "build": "turbo run build",
+    "build:web": "turbo run build --filter=@repo/web",
+    "build:api": "turbo run build --filter=@repo/api",
+    "start:api": "turbo run start --filter=@repo/api",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,scss,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,scss,md}\"",
+    "check-types": "turbo run check-types"
+  },
+  "devDependencies": {
+    "@trivago/prettier-plugin-sort-imports": "^5.2.2",
+    "esbuild": "catalog:",
+    "prettier": "catalog:",
+    "prettier-plugin-organize-imports": "^4.2.0",
+    "turbo": "^2.9.16",
+    "typescript": "catalog:"
+  },
+  "packageManager": "pnpm@11.0.9",
+  "engines": {
+    "node": ">=18"
+  }
+}

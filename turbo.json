@@ -1,0 +1,31 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "env": ["APP_ENV", "API_BASE_URL"]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**"],
+      "env": ["APP_ENV", "API_BASE_URL"]
+    },
+    "start": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true,
+      "env": ["APP_ENV", "API_BASE_URL"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"],
+      "env": ["APP_ENV", "API_BASE_URL"]
+    },
+    "check-types": {
+      "dependsOn": ["^check-types"],
+      "env": ["APP_ENV", "API_BASE_URL"]
+    }
+  }
+}
