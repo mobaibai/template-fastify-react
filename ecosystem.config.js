@@ -1,5 +1,5 @@
-const NODE_VERSION = '22'
-const NVM_NODE_PATH = `/root/.nvm/versions/node/v${NODE_VERSION}/bin/node`
+const NODE_VERSION = 'v18'
+const NVM_NODE_PATH = `/home/ubuntu/.nvm/versions/node/v${NODE_VERSION}/bin/node`
 
 const fs = require('fs')
 const nodePath = fs.existsSync(NVM_NODE_PATH) ? NVM_NODE_PATH : process.execPath
@@ -8,9 +8,12 @@ module.exports = {
   apps: [
     {
       name: 'api',
-      script: './server.cjs',
+      script: './bundle.cjs',
       interpreter: nodePath,
-      env: { NODE_ENV: 'production' },
+      env: {
+        NODE_ENV: 'production',
+        PORT: 39005
+      },
     },
   ],
 }

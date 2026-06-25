@@ -3,16 +3,46 @@ name: Deploy
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: '选择部署目标'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - web
+          - api
 
 jobs:
-  deploy:
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      api: ${{ steps.filter.outputs.api }}
     steps:
       - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+              - 'packages/**'
+            api:
+              - 'apps/api/**'
+              - 'packages/**'
+
+  deploy:
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
 
       - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -20,44 +50,71 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build all
-        run: pnpm run build
+      # 构建 Web（自动触发：文件有变更；手动触发：选择 web 或 all）
+      - name: Build Web
+        if: needs.changes.outputs.web == 'true' || github.event.inputs.deploy_target == 'web' || github.event.inputs.deploy_target == 'all'
+        run: pnpm --filter ./apps/web build
 
+      # 构建 API（自动触发：文件有变更；手动触发：选择 web 或 api）
+      - name: Build API
+        if: needs.changes.outputs.api == 'true' || github.event.inputs.deploy_target == 'api' || github.event.inputs.deploy_target == 'all'
+        run: pnpm --filter ./apps/api build
+
+      # 部署 Web
       - name: Deploy Web (static files)
+        if: needs.changes.outputs.web == 'true' || github.event.inputs.deploy_target == 'web' || github.event.inputs.deploy_target == 'all'
         uses: easingthemes/ssh-deploy@main
         with:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.SERVER_HOST }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          REMOTE_PORT: ${{ secrets.SERVER_PORT }}
           ARGS: -rlgoDzvc -i --delete
           SOURCE: apps/web/dist/
           TARGET: ${{ secrets.SERVER_WEB_PATH }}
           SCRIPT_BEFORE: |
             mkdir -p ${{ secrets.SERVER_WEB_PATH }}
+            rm -rf ${{ secrets.SERVER_WEB_PATH }}/*
 
+      # 部署 API bundle
       - name: Deploy API (server bundle)
+        if: needs.changes.outputs.api == 'true' || github.event.inputs.deploy_target == 'api' || github.event.inputs.deploy_target == 'all'
         uses: easingthemes/ssh-deploy@main
         with:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.SERVER_HOST }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          REMOTE_PORT: ${{ secrets.SERVER_PORT }}
           ARGS: -rlgoDzvc -i --delete
           SOURCE: apps/api/dist/bundle.cjs
           TARGET: ${{ secrets.SERVER_API_PATH }}
           SCRIPT_BEFORE: |
             mkdir -p ${{ secrets.SERVER_API_PATH }}
+            rm -f ${{ secrets.SERVER_API_PATH }}/bundle.cjs
 
-      - name: Deploy PM2 config & restart
+      # 部署 PM2 配置
+      - name: Deploy PM2 config
+        if: needs.changes.outputs.api == 'true' || github.event.inputs.deploy_target == 'api' || github.event.inputs.deploy_target == 'all'
         uses: easingthemes/ssh-deploy@main
         with:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.SERVER_HOST }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          REMOTE_PORT: ${{ secrets.SERVER_PORT }}
           ARGS: -rlgoDzvc -i --delete
           SOURCE: ecosystem.config.js
           TARGET: ${{ secrets.SERVER_API_PATH }}
 
+      # 重启 PM2（只有 API 变更时才执行）
       - name: Restart PM2
+        if: needs.changes.outputs.api == 'true' || github.event.inputs.deploy_target == 'api' || github.event.inputs.deploy_target == 'all'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SERVER_HOST }}
-          port: ${{ secrets.SERVER_PORT || '22' }}
+          port: ${{ secrets.SERVER_PORT }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ${{ secrets.SERVER_API_PATH }}
-            pm2 start ecosystem.config.js || pm2 restart ecosystem.config.js
+            pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
+            pm2 save
