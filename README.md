@@ -128,7 +128,7 @@ pnpm dev:api
 | PUT | `/api/items/:id` | 更新 |
 | DELETE | `/api/items/:id` | 删除 |
 
-## 部署(宝塔)
+## 部署(传统服务器)
 
 详见 [docs/deploy.md](docs/deploy.md)。
 
